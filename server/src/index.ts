@@ -3,7 +3,6 @@ import http from 'http';
 
 const PORT = process.env.PORT || 8080;
 
-git checkout feature/kan-10-websocket-server
 const server = http.createServer((req, res) => {
     if (req.url === '/health') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
