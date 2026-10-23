@@ -1,34 +1,20 @@
 # Dependencies
 node_modules/
 
-# Build
+# Build outputs
 dist/
-build/
 dist-ssr/
+build/
 
 # IDE
 .idea/
 *.iml
 .vscode/
-.vs/
 
 # Env
 .env
 .env.local
-.env.*.local
-
-# Logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
 
 # OS
 .DS_Store
 Thumbs.db
-
-# PWA generated files
-client/dev-dist/
-client/dist/
-client/node_modules/
