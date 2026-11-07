@@ -1,6 +1,6 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import http from 'http';
-import { ClientMessage, ServerMessage } from './types.js';
+import { RoomManager } from "./RoomManager.js";
 
 const PORT = process.env.PORT || 8080;
 
@@ -21,6 +21,8 @@ const server = http.createServer((req, res) => {
 });
 
 const wss = new WebSocketServer({ server });
+const roomManager = new RoomManager();
+const socketMeta = new WeakMap<WebSocket, { roomId: string; clientId: string }>();
 
 
 function sendMessage(ws: WebSocket, message: ServerMessage) {
@@ -104,40 +106,66 @@ wss.on('connection', (ws: WebSocket) => {
                 handleDisconnect();
             }
 
+            if (message.type === 'join') {
+                const { roomId, userId } = message;
+
+                roomManager.addClient(roomId, userId, ws);
+                socketMeta.set(ws, { roomId, clientId: userId });
+
+                const clients = roomManager.getClientsInRoom(roomId);
+                clients.forEach((client) => {
+                    if (client.id !== userId) {
+                        client.socket.send(JSON.stringify({ type: 'user-joined', userId }));
+                    }
+                });
+                return;
+            }
+
+            if (message.type === 'offer' || message.type === 'answer' || message.type === 'candidate') {
+                const meta = socketMeta.get(ws);
+                if (!meta) {
+                    ws.send(JSON.stringify({ type: 'error', message: 'Сначала войдите в комнату' }));
+                    return;
+                }
+
+                const target = roomManager.getClient(meta.roomId, message.to);
+                if (target) {
+                    target.socket.send(JSON.stringify({ ...message, from: meta.clientId }));
+                }
+                return;
+            }
+
+            ws.send(JSON.stringify({ type: 'echo', original: message }));
+
         } catch (error) {
             console.error(`[Error] Ошибка парсинга JSON:`, error);
             sendMessage(ws, { type: 'error', message: 'Неверный формат JSON' });
         }
     });
 
-
     ws.on('close', () => {
-        handleDisconnect();
+        const meta = socketMeta.get(ws);
+        if (meta) {
+            const clients = roomManager.getClientsInRoom(meta.roomId);
+            clients.forEach((client) => {
+                if (client.id !== meta.clientId) {
+                    client.socket.send(JSON.stringify({
+                        type: 'user-left',
+                        userId: meta.clientId
+                    }));
+                }
+            });
+
+            roomManager.removeClient(meta.roomId, meta.clientId);
+            console.log(`[Disconnect] Клиент ${meta.clientId} отключился. Осталось клиентов: ${wss.clients.size}`);
+        } else {
+            console.log(`[Disconnect] Клиент отключился (не был в комнате). Осталось клиентов: ${wss.clients.size}`);
+        }
     });
 
-    function handleDisconnect() {
-        if (currentUserId && currentRoomId) {
-            const room = rooms.get(currentRoomId);
-            if (room) {
-                room.delete(currentUserId);
-
-                if (room.size === 0) {
-                    rooms.delete(currentRoomId);
-                } else {
-
-                    broadcastToRoom(currentRoomId, currentUserId, {
-                        type: 'user-left',
-                        userId: currentUserId
-                    });
-                }
-            }
-            clients.delete(currentUserId);
-            console.log(`[Leave] Пользователь ${currentUserId} покинул комнату ${currentRoomId}`);
-
-            currentUserId = null;
-            currentRoomId = null;
-        }
-    }
+    ws.on('error', (error) => {
+        console.error(`[Socket Error] Ошибка сокета:`, error);
+    });
 });
 
 server.listen(PORT, () => {
