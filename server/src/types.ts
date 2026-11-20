@@ -22,19 +22,19 @@ export interface LeaveMessage extends BaseMessage {
 export interface OfferMessage extends BaseMessage {
     type: 'offer';
     to: string;
-    sdp: any;
+    sdp: unknown;
 }
 
 export interface AnswerMessage extends BaseMessage {
     type: 'answer';
     to: string;
-    sdp: any;
+    sdp: unknown;
 }
 
 export interface CandidateMessage extends BaseMessage {
     type: 'candidate';
     to: string;
-    candidate: any;
+    candidate: unknown;
 }
 
 export type ClientMessage = JoinMessage | LeaveMessage | OfferMessage | AnswerMessage | CandidateMessage;
@@ -53,19 +53,19 @@ export interface UserLeftMessage extends BaseMessage {
 export interface ServerOfferMessage extends BaseMessage {
     type: 'offer';
     from: string; // ID того, кто прислал оффер
-    sdp: any;
+    sdp: unknown;
 }
 
 export interface ServerAnswerMessage extends BaseMessage {
     type: 'answer';
     from: string;
-    sdp: any;
+    sdp: unknown;
 }
 
 export interface ServerCandidateMessage extends BaseMessage {
     type: 'candidate';
     from: string;
-    candidate: any;
+    candidate: unknown;
 }
 
 export interface ErrorMessage extends BaseMessage {
@@ -74,3 +74,21 @@ export interface ErrorMessage extends BaseMessage {
 }
 
 export type ServerMessage = UserJoinedMessage | UserLeftMessage | ServerOfferMessage | ServerAnswerMessage | ServerCandidateMessage | ErrorMessage;
+
+export function validateMessage(msg: any): msg is ClientMessage {
+    if (!msg || typeof msg !== 'object' || !msg.type) return false;
+
+    switch (msg.type) {
+        case 'join':
+            return typeof msg.roomId === 'string' && msg.roomId.length > 0
+                && typeof msg.userId === 'string' && msg.userId.length > 0;
+        case 'leave':
+            return true;
+        case 'offer':
+        case 'answer':
+        case 'candidate':
+            return typeof msg.to === 'string' && msg.to.length > 0;
+        default:
+            return false;
+    }
+}
