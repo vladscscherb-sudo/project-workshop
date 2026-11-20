@@ -14,7 +14,7 @@ export class AudioService {
     private audioContext: AudioContext | null = null;
     private analyser: AnalyserNode | null = null;
     private source: MediaStreamAudioSourceNode | null = null;
-    private rafId: number | null = null;
+    private intervalId: ReturnType<typeof setInterval> | null = null;
     private dataArray: Float32Array<ArrayBuffer> = new Float32Array(0);
     private state: MicState = 'idle';
     private destroyed = false;
@@ -49,7 +49,27 @@ export class AudioService {
             this.stream = stream;
             this.setupAnalyser(stream);
             this.setState('active');
-            this.loop();
+            this.intervalId = setInterval(this.loop, 100);
+
+            const audioTrack = stream.getAudioTracks()[0];
+            if (audioTrack) {
+                audioTrack.onended = () => {
+                    console.error('Трек завершился. Микрофон отключен.');
+                    this.stop();
+                    this.setState('error');
+                    this.events.onError(new Error('Микрофон отключен из системы'));
+                };
+
+                audioTrack.onmute = () => {
+                    console.log('Микрофон замьючен на уровне ОС');
+                    this.setState('muted');
+                };
+
+                audioTrack.onunmute = () => {
+                    console.log('Микрофон снова активен');
+                    this.setState('active');
+                };
+            }
         } catch (err) {
             this.setState('error');
             this.events.onError(err as Error);
@@ -90,7 +110,6 @@ export class AudioService {
         const rms = Math.sqrt(sum / this.dataArray.length);
 
         this.events.onVolume(rms);
-        this.rafId = requestAnimationFrame(this.loop);
     };
 
     setMuted(muted: boolean): void {
@@ -114,9 +133,9 @@ export class AudioService {
     }
 
     stop(): void {
-        if (this.rafId !== null) {
-            cancelAnimationFrame(this.rafId);
-            this.rafId = null;
+        if (this.intervalId !== null) {
+            clearInterval(this.intervalId);
+            this.intervalId = null;
         }
         this.stream?.getTracks().forEach((t) => t.stop());
         this.source?.disconnect();
