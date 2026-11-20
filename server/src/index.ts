@@ -1,6 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import http from 'http';
 import { RoomManager } from "./RoomManager.js";
+import { validateMessage } from './types.js';
 
 const PORT = process.env.PORT || 8080;
 
@@ -34,6 +35,11 @@ wss.on('connection', (ws: WebSocket, req) => {
     ws.on('message', (data: Buffer) => {
         try {
             const message = JSON.parse(data.toString());
+            if (!validateMessage(message)) {
+                console.warn(`[Security] Отклонено невалидное сообщение:`, message);
+                ws.send(JSON.stringify({ type: 'error', message: 'Invalid message format' }));
+                return;
+            }
             console.log(`[Message] Получено сообщение:`, message);
 
             if (message.type === 'join') {
