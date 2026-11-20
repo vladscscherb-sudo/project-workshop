@@ -137,6 +137,12 @@ export class AudioService {
             clearInterval(this.intervalId);
             this.intervalId = null;
         }
+        const audioTrack = this.stream?.getAudioTracks()[0];
+        if (audioTrack) {
+            audioTrack.onended = null;
+            audioTrack.onmute = null;
+            audioTrack.onunmute = null;
+        }
         this.stream?.getTracks().forEach((t) => t.stop());
         this.source?.disconnect();
         this.analyser?.disconnect();
